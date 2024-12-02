@@ -34,12 +34,50 @@ func getOperation(a int, b int) Operation {
 	return Increase
 }
 
-func NewLevel(values []string) Level {
+func stringToInts(values []string) []int {
 	intVals := make([]int, 0)
 	for idx := range values {
 		intVal := Must(strconv.ParseInt(values[idx], 0, 64))
 		intVals = append(intVals, int(intVal))
 	}
+	return intVals
+}
+
+func NewLevelP2(values []string) Level {
+	ordinals := stringToInts(values)
+
+	isSafe := isLevelSave(ordinals[0], ordinals[1:], None, false)
+
+	return Level{
+		Ordinals: ordinals,
+		IsSafe:   isSafe,
+		Ope:      None,
+	}
+}
+
+func isLevelSave(origin int, values []int, lastOpe Operation, sbd bool) bool {
+	if len(values) <= 0 {
+		return true
+	}
+	next := values[0]
+
+	diff := origin - next
+	operation := getOperation(origin, next)
+	if lastOpe == None {
+		lastOpe = operation
+	}
+
+	if lastOpe != operation || operation == Equity || math.Abs(float64(diff)) > 3 {
+		if !sbd {
+			return isLevelSave(values[0], values[1:], lastOpe, true)
+		}
+		return false
+	}
+	return isLevelSave(next, values[1:], lastOpe, sbd)
+}
+
+func NewLevel(values []string) Level {
+	intVals := stringToInts(values)
 
 	isSafe := true
 	var lastOpe Operation
@@ -78,7 +116,7 @@ func NewLevel(values []string) Level {
 }
 
 func main() {
-	file := Must(os.Open("./input/part1.txt"))
+	file := Must(os.Open("./input/part2.txt"))
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
@@ -86,8 +124,11 @@ func main() {
 
 	for scanner.Scan() {
 		text := scanner.Text()
+		if text == "" {
+			continue
+		}
 		values := strings.Split(text, " ")
-		levels = append(levels, NewLevel(values))
+		levels = append(levels, NewLevelP2(values))
 	}
 
 	count := 0

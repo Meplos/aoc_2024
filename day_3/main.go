@@ -24,14 +24,26 @@ func NewMul(l string, r string) MulOperation {
 	}
 }
 
+type Condition string
+
+const (
+	Do   Condition = "do()"
+	Dont Condition = "don't()"
+)
+
+func isCondition(str string) bool {
+	return str == string(Do) || str == string(Dont)
+}
+
 func main() {
 	fmt.Println("==== DAY 3 ====")
 
-	file := Must(os.Open("input/part1.txt"))
+	file := Must(os.Open("input/part2.txt"))
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
 
-	instruction := regexp.MustCompile(`mul\(\d+,\d+\)`)
+	instruction := regexp.MustCompile(`mul\(\d+,\d+\)|do\(\)|don\'t\(\)`)
+	isDoing := true
 	integer := regexp.MustCompile(`\d+`)
 
 	total := 0
@@ -40,6 +52,21 @@ func main() {
 		text := scanner.Text()
 		matched := instruction.FindAll([]byte(text), -1)
 		for _, m := range matched {
+			op := string(m)
+			if isCondition(op) {
+				if op == string(Dont) {
+					isDoing = false
+				}
+				if op == string(Do) {
+					isDoing = true
+				}
+				continue
+			}
+
+			if !isDoing {
+				continue
+			}
+
 			integers := integer.FindAll(m, -1)
 			operation := NewMul(string(integers[0]), string(integers[1]))
 			total += operation.Execute()

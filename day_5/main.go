@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,12 +30,12 @@ func main() {
 			continue
 		}
 		if isUpdateList {
-			ParseUpdateList(text)
+			//			ParseUpdateList(text)
+			ParseAndSort(text)
 		} else {
 			ParseRules(text)
 		}
 	}
-	fmt.Println(goodList)
 	counter := 0
 	for _, currentList := range goodList {
 		size := len(currentList)
@@ -46,15 +47,40 @@ func main() {
 
 func ParseUpdateList(str string) {
 	list := ConvertToIntList(strings.Split(str, ","))
-	for curr, val := range list {
+	for curr := 0; curr < len(list); curr++ {
 		for i := 0; i < curr; i++ {
-			if slices.Contains(rules[val], list[i]) {
+			if slices.Contains(rules[list[curr]], list[i]) {
 				return
 			}
+			// fmt.Print(".")
 		}
 	}
+	fmt.Println("v")
 
 	goodList = append(goodList, list)
+}
+
+func ParseAndSort(str string) {
+	list := ConvertToIntList(strings.Split(str, ","))
+	swap := reflect.Swapper(list)
+	fmt.Printf("%v -> ", list)
+	hasChange := false
+	for curr := 0; curr < len(list); curr++ {
+		for i := 0; i < curr; i++ {
+			if slices.Contains(rules[list[curr]], list[i]) {
+				fmt.Printf(" Breaking rule %v|%v -> ", list[curr], list[i])
+				swap(curr, i)
+				hasChange = true
+				curr = 0
+			}
+			// fmt.Print(".")
+		}
+	}
+	fmt.Printf("%v\n", list)
+
+	if hasChange {
+		goodList = append(goodList, list)
+	}
 }
 
 func ConvertToIntList(arr []string) []int {
@@ -74,7 +100,6 @@ func ParseRules(str string) {
 		rules[x] = make([]int, 0)
 	}
 	rules[x] = append(rules[x], y)
-	fmt.Println(list)
 }
 
 func Must[T any](value T, err error) T {

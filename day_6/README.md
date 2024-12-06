@@ -91,3 +91,7 @@ Your puzzle answer was 1915.
 Both parts of this puzzle are complete! They provide two gold stars: **
 
 
+===== RACE ======
+PB: 18.881733008 (basic goroutine)
+71.994440676s (no opti)
+

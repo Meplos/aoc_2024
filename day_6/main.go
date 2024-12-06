@@ -262,22 +262,34 @@ func main() {
 	res := 0
 	origin := NewGrid(arr)
 	yToClear := 0
-	nbIt := 1
+	nbIt := 0
+	channels := make([]chan bool, 0)
 	for y := 0; y < origin.Height; y++ {
 		for x := 0; x < origin.Width; x++ {
-			//			fmt.Printf("it n°%v\n", nbIt)
-			if origin.HasObstacle(x, y) || (x == originGuard.X && y == originGuard.Y) {
-				continue
-			}
-			grid := origin.Copy()
-			grid.PlaceObstacle(x, y)
-			guard := originGuard.Copy()
-			if RunPath(&guard, &grid, nbIt) {
-				res++
-			}
+			channels = append(channels, make(chan bool))
+			go func(ch chan bool) {
+				//			fmt.Printf("it n°%v\n", nbIt)
+				if origin.HasObstacle(x, y) || (x == originGuard.X && y == originGuard.Y) {
+					ch <- false
+					close(ch)
+					return
+				}
+				grid := origin.Copy()
+				grid.PlaceObstacle(x, y)
+				guard := originGuard.Copy()
+				res := RunPath(&guard, &grid, nbIt)
+				ch <- res
+				close(ch)
+			}(channels[len(channels)-1])
 			nbIt++
 		}
 		yToClear++
+	}
+	for _, ch := range channels {
+		incomming := <-ch
+		if incomming {
+			res++
+		}
 	}
 	end := time.Now()
 	fmt.Printf("Result = %v\n", res)

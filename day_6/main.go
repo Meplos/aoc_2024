@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,11 +14,13 @@ import (
 type Direction string
 
 const (
-	Forward  Direction = "^"
-	Backward Direction = "v"
-	Right    Direction = ">"
-	Left     Direction = "<"
-	Obstacle string    = "#"
+	Forward        Direction = "^"
+	Backward       Direction = "v"
+	Right          Direction = ">"
+	Left           Direction = "<"
+	Obstacle       string    = "#"
+	CustomObstacle string    = "O"
+	None           string    = "."
 )
 
 type Grid struct {
@@ -34,13 +37,33 @@ func NewGrid(grid [][]string) Grid {
 	}
 }
 
-func (g *Guard) HasVisited(x int, y int) bool {
-	h := Hash(x, y)
-	_, ok := g.Visited[string(h)]
-	return ok
+func (g *Grid) Copy() Grid {
+	nBoard := make([][]string, 0, g.Height)
+	for _, row := range g.Board {
+		nRow := make([]string, 0, g.Width)
+		for _, value := range row {
+			nRow = append(nRow, value)
+		}
+		nBoard = append(nBoard, nRow)
+	}
+	return NewGrid(nBoard)
 }
 
-func (g *Grid) Display(guard Guard) {
+func (g *Grid) PlaceObstacle(x int, y int) {
+	if !g.IsInBound(x, y) {
+		panic("Obstacle not in bound")
+	}
+	g.Board[y][x] = CustomObstacle
+}
+
+func (g *Grid) ClearObstacle(x, y int) {
+	if !g.IsInBound(x, y) {
+		panic("Obstacle not in bound")
+	}
+	g.Board[y][x] = None
+}
+
+func (g *Grid) Display(guard Guard, nbIt int) {
 	ClearScreen()
 
 	fmt.Printf("Screen[%v:%v]\n", g.Width, g.Height)
@@ -60,14 +83,22 @@ func (g *Grid) Display(guard Guard) {
 		fmt.Println()
 	}
 	fmt.Printf("Guard[%v][%v:%v] | Next dir : %v\n", guard.Char, guard.X, guard.Y, guard.ChangeDirection())
-	time.Sleep(time.Duration(100 * time.Millisecond))
+	fmt.Printf("it n°%v\n", nbIt)
+	time.Sleep(time.Duration(50 * time.Millisecond))
 }
 
 func (g *Grid) HasObstacle(x int, y int) bool {
 	if !g.IsInBound(x, y) {
 		return false
 	}
-	return g.Board[y][x] == Obstacle
+	return g.Board[y][x] == Obstacle || g.Board[y][x] == CustomObstacle
+}
+
+func (g *Grid) HasCustomObstacle(x, y int) bool {
+	if !g.IsInBound(x, y) {
+		return false
+	}
+	return g.Board[y][x] == CustomObstacle
 }
 
 type (
@@ -93,47 +124,59 @@ func (g *Guard) ChangeDirection() Direction {
 	panic("Invalid direction")
 }
 
-func (g *Guard) MoveForward(grid Grid, x int, y int) bool {
+func (g *Guard) MoveForward(grid Grid, x int, y int) (bool, error) {
 	nextX := g.X
 	nextY := g.Y - 1
 	if grid.HasObstacle(nextX, nextY) {
-		return false
+		return false, nil
+	}
+	if g.HasVisited(nextX, nextY) {
+		return true, errors.New("Already pass")
 	}
 	g.Visit(nextX, nextY)
-	return true
+	return true, nil
 }
 
-func (g *Guard) MoveRight(grid Grid, x int, y int) bool {
+func (g *Guard) MoveRight(grid Grid, x int, y int) (bool, error) {
 	nextX := g.X + 1
 	nextY := g.Y
 	if grid.HasObstacle(nextX, nextY) {
-		return false
+		return false, nil
+	}
+	if g.HasVisited(nextX, nextY) {
+		return true, errors.New("Already pass")
 	}
 	g.Visit(nextX, nextY)
-	return true
+	return true, nil
 }
 
-func (g *Guard) MoveBackward(grid Grid, x int, y int) bool {
+func (g *Guard) MoveBackward(grid Grid, x int, y int) (bool, error) {
 	nextX := g.X
 	nextY := g.Y + 1
 	if grid.HasObstacle(nextX, nextY) {
-		return false
+		return false, nil
+	}
+	if g.HasVisited(nextX, nextY) {
+		return true, errors.New("Already pass")
 	}
 	g.Visit(nextX, nextY)
-	return true
+	return true, nil
 }
 
-func (g *Guard) MoveLeft(grid Grid, x int, y int) bool {
+func (g *Guard) MoveLeft(grid Grid, x int, y int) (bool, error) {
 	nextX := g.X - 1
 	nextY := g.Y
 	if grid.HasObstacle(nextX, nextY) {
-		return false
+		return false, nil
+	}
+	if g.HasVisited(nextX, nextY) {
+		return true, errors.New("Already pass")
 	}
 	g.Visit(nextX, nextY)
-	return true
+	return true, nil
 }
 
-func (g *Guard) Move(grid Grid) bool {
+func (g *Guard) Move(grid Grid) (bool, error) {
 	switch g.Char {
 	case Forward:
 		return g.MoveForward(grid, g.X, g.Y)
@@ -147,15 +190,15 @@ func (g *Guard) Move(grid Grid) bool {
 	panic("Invalid direction")
 }
 
-func Hash(x int, y int) []byte {
-	key := fmt.Sprintf("%v|%v", x, y)
+func Hash(x int, y int, d Direction) []byte {
+	key := fmt.Sprintf("%v|%v|%v", x, y, d)
 	hash := md5.New()
 	hash.Write([]byte(key))
 	return hash.Sum(nil)
 }
 
 func NewGuard(x int, y int, direction Direction) Guard {
-	h := Hash(x, y)
+	h := Hash(x, y, direction)
 	return Guard{
 		X:       x,
 		Y:       y,
@@ -164,11 +207,26 @@ func NewGuard(x int, y int, direction Direction) Guard {
 	}
 }
 
+func (g *Guard) Copy() Guard {
+	return Guard{
+		X:       g.X,
+		Y:       g.Y,
+		Char:    g.Char,
+		Visited: make(map[string]bool),
+	}
+}
+
 func (g *Guard) Visit(x int, y int) {
-	h := Hash(x, y)
+	h := Hash(x, y, g.Char)
 	g.Visited[string(h)] = true
 	g.X = x
 	g.Y = y
+}
+
+func (g *Guard) HasVisited(x int, y int) bool {
+	h := Hash(x, y, g.Char)
+	_, ok := g.Visited[string(h)]
+	return ok
 }
 
 func (g *Grid) IsInBound(x int, y int) bool {
@@ -176,6 +234,7 @@ func (g *Grid) IsInBound(x int, y int) bool {
 }
 
 func main() {
+	start := time.Now()
 	file := Must(os.Open("input/part1.txt"))
 	scanner := bufio.NewScanner(file)
 	fmt.Println(" ==== Day 6 ====")
@@ -183,33 +242,61 @@ func main() {
 	scanner.Split(bufio.ScanLines)
 
 	arr := make([][]string, 0)
-	var guard Guard
+	var originGuard Guard
 	y := 0
 	for scanner.Scan() {
 		text := scanner.Text()
 		line := make([]string, 0)
 		for x, v := range strings.Split(text, "") {
 			if v == string(Forward) || v == string(Backward) || v == string(Right) || v == string(Left) {
-				guard = NewGuard(x, y, Direction(v))
-				line = append(line, "X")
+				originGuard = NewGuard(x, y, Direction(v))
+				line = append(line, None)
 				continue
 			}
 			line = append(line, v)
 		}
 		arr = append(arr, line)
-
 		y++
 
 	}
-	grid := NewGrid(arr)
+	res := 0
+	origin := NewGrid(arr)
+	yToClear := 0
+	nbIt := 1
+	for y := 0; y < origin.Height; y++ {
+		for x := 0; x < origin.Width; x++ {
+			//			fmt.Printf("it n°%v\n", nbIt)
+			if origin.HasObstacle(x, y) || (x == originGuard.X && y == originGuard.Y) {
+				continue
+			}
+			grid := origin.Copy()
+			grid.PlaceObstacle(x, y)
+			guard := originGuard.Copy()
+			if RunPath(&guard, &grid, nbIt) {
+				res++
+			}
+			nbIt++
+		}
+		yToClear++
+	}
+	end := time.Now()
+	fmt.Printf("Result = %v\n", res)
+	fmt.Printf("Duration : %v\n", end.Sub(start).Seconds())
+}
+
+func RunPath(guard *Guard, grid *Grid, nbIt int) bool {
 	for grid.IsInBound(guard.X, guard.Y) {
-		for !guard.Move(grid) {
+		hasMove, err := guard.Move(*grid)
+		if err != nil {
+			return true
+		}
+		if !hasMove {
 			guard.Char = guard.ChangeDirection()
 		}
 
-		// grid.Display(guard)
+		// grid.Display(*guard, nbIt)
 	}
-	fmt.Printf("Result = %v\n", len(guard.Visited)-1)
+	return false
 }
 
 func Must[T any](value T, err error) T {

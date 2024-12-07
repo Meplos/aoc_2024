@@ -50,3 +50,4 @@ Now, apart from the three equations that could be made true using only addition 
 Adding up all six test values (the three that could be made before using only + and * plus the new three that can now be made by also using ||) produces the new total calibration result of 11387.
 
 Using your new knowledge of elephant hiding spots, determine which equations could possibly be true. What is their total calibration result?
+264184041398847

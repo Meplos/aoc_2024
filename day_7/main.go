@@ -13,6 +13,7 @@ type Node struct {
 	Value          int
 	Addition       *Node // Addition
 	Multiplication *Node // Multiplication
+	Concatenation  *Node
 }
 
 func NewNode(value int) Node {
@@ -31,6 +32,10 @@ func (n *Node) AppendMultiplication(mult *Node) {
 	n.Multiplication = mult
 }
 
+func (n *Node) AppendConcat(c *Node) {
+	n.Multiplication = c
+}
+
 func main() {
 	fmt.Println("==== Day 7 ====")
 	file := Must(os.Open("input/part1.txt"))
@@ -47,7 +52,7 @@ func main() {
 		res, operandes := ParseEquation(text)
 		var last []*Node = make([]*Node, 0)
 		for i, op := range operandes {
-			nodeToCreate := int(math.Pow(2, float64(i)))
+			nodeToCreate := int(math.Pow(3, float64(i)))
 			nodeCreated := make([]*Node, 0)
 			for x := 0; x < nodeToCreate; x++ {
 				node := NewNode(op)
@@ -55,12 +60,15 @@ func main() {
 			}
 			nodeToAdd := 0
 			for x := 0; x < len(last); x++ {
-
 				nodeCreated[nodeToAdd].Value += last[x].Value
 				last[x].AppendAddition(nodeCreated[nodeToAdd])
 				nodeToAdd++
 				nodeCreated[nodeToAdd].Value *= last[x].Value
 				last[x].AppendMultiplication(nodeCreated[nodeToAdd])
+				nodeToAdd++
+				concat := fmt.Sprintf("%v%v", last[x].Value, nodeCreated[nodeToAdd].Value)
+				nodeCreated[nodeToAdd].Value = int(Must(strconv.ParseInt(concat, 0, 64)))
+				last[x].AppendConcat(nodeCreated[nodeToAdd])
 				nodeToAdd++
 			}
 			last = make([]*Node, len(nodeCreated))
